@@ -49,6 +49,8 @@ struct PreferencesView: View {
                 Text("Quelques réglages. Et le reste suit.").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             settingsGroup("AU QUOTIDIEN") {
+                Text("Prisme reste active dans la barre de menus quand vous fermez cette fenêtre, sans icône dans le Dock. Pour l’arrêter, choisissez « Quitter Prisme » dans son menu.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 Toggle("Palette pendant un glisser-déposer", isOn: $model.globalDragEnabled).toggleStyle(.switch)
                 Text("Glissez un fichier depuis le Finder, appuyez sur Maj, puis déposez-le sur un format. ⌘ ouvre les outils, ⌃ les actions. Échap ferme la palette.")
                     .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)

@@ -22,7 +22,10 @@ open dist/Prisme.app
 
 For everyday use, drag `dist/Prisme.app` into the macOS Applications folder.
 Then press Command–Space, type **Prisme**, and press Return. The menu bar icon
-keeps the conversion wheel available after closing the main window.
+keeps the conversion wheel available after closing the main window. Prisme runs
+as a menu bar app without a Dock icon, including while its window is visible.
+Closing the window leaves the app and drag wheel running. Use **Open Prisme**
+in the menu bar to reopen it, or **Quit Prisme** to stop the app explicitly.
 
 To build a universal Apple silicon + Intel application:
 
