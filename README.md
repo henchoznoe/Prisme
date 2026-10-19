@@ -158,3 +158,22 @@ the distinction between observations and unverified behavior are recorded in
 Raw investigation results remain in ignored `.analysis/`. No license checks,
 trial counters, original binaries, artwork, or proprietary resources are modified
 or included. REA is available from its [official repository](https://github.com/morluto/rea).
+
+## Acknowledgments
+
+- [Tangerine](https://tangerineformac.com/) and its creators inspired the
+  drag + modifier key workflow and circular conversion interface. Prisme is an
+  independent implementation with its own code, branding and artwork, and is
+  not affiliated with or endorsed by Tangerine.
+- [REA](https://github.com/morluto/rea), by morluto and its contributors, was
+  used for local static inspection during development. REA is
+  [MIT-licensed](https://github.com/morluto/rea/blob/main/LICENSE) and is not
+  bundled with Prisme.
+- [FFmpeg](https://ffmpeg.org/), [Pandoc](https://pandoc.org/),
+  [libwebp](https://developers.google.com/speed/webp) and
+  [libavif](https://github.com/AOMediaCodec/libavif) provide optional conversion
+  engines through separately installed command-line tools. They retain their
+  own licenses and are not included in Prisme's application bundle.
+
+The README banner, app icon and screenshots were created for Prisme. No
+Tangerine code, icons, screenshots or packaged conversion helpers are included.
