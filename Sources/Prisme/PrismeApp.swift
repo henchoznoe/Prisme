@@ -10,7 +10,6 @@ struct PrismeApp: App {
         WindowGroup("Prisme", id: "main") {
             WorkspaceView().environmentObject(model)
                 .frame(minWidth: 900, minHeight: 650)
-                .preferredColorScheme(.dark)
                 .onOpenURL { model.add([$0]) }
         }
         .defaultSize(width: 1100, height: 770)

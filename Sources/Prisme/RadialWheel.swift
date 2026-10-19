@@ -17,6 +17,7 @@ final class GlobalDragController {
     private var timer: Timer?
     private var panel: NSPanel?
     private var wheel: RadialDropView?
+    private var wheelSurface: NSView?
     private var wasDragging = false
     private var previousFlags: NSEvent.ModifierFlags = []
     private var dismissedDuringDrag = false
@@ -86,7 +87,7 @@ final class GlobalDragController {
             let panel = WheelPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 340), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.backgroundColor = .clear
             panel.isOpaque = false
-            panel.hasShadow = false
+            panel.hasShadow = true
             panel.level = .popUpMenu
             panel.hidesOnDeactivate = false
             panel.isReleasedWhenClosed = false
@@ -101,11 +102,17 @@ final class GlobalDragController {
                 self.dismiss()
             }
             wheel.onDismiss = { [weak self] in self?.dismiss() }
-            panel.contentView = wheel
+            let container = NSView(frame: wheel.bounds)
+            let surface = makeWheelSurface()
+            container.addSubview(surface)
+            container.addSubview(wheel)
+            panel.contentView = container
+            self.wheelSurface = surface
             self.wheel = wheel
             self.panel = panel
         }
         wheel?.configure(items: items, files: urls, mode: mode, glass: model.wheelAppearance == "glass")
+        wheelSurface?.isHidden = model.wheelAppearance != "glass" || NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
         let newlyVisible = panel?.isVisible != true
         if newlyVisible {
             let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
@@ -131,6 +138,30 @@ final class GlobalDragController {
     func dismiss() {
         panel?.orderOut(nil)
         dismissedDuringDrag = true
+    }
+
+    private func makeWheelSurface() -> NSView {
+        let frame = NSRect(x: 21.4, y: 21.4, width: 297.2, height: 297.2)
+        if #available(macOS 26, *) {
+            let effect = NSGlassEffectView(frame: frame)
+            effect.style = .regular
+            effect.cornerRadius = frame.width / 2
+            effect.tintColor = PrismTheme.accentColor.withAlphaComponent(0.06)
+            effect.contentView = NSView(frame: NSRect(origin: .zero, size: frame.size))
+            #if compiler(>=6.4)
+            if #available(macOS 27, *) { effect.effectIsInteractive = true }
+            #endif
+            return effect
+        } else {
+            let effect = NSVisualEffectView(frame: frame)
+            effect.material = .popover
+            effect.blendingMode = .behindWindow
+            effect.state = .active
+            effect.wantsLayer = true
+            effect.layer?.cornerRadius = frame.width / 2
+            effect.layer?.masksToBounds = true
+            return effect
+        }
     }
 }
 
@@ -238,31 +269,34 @@ final class RadialDropView: NSView {
         scale.scale(by: bounds.width / 460)
         scale.concat()
         let visible = visibleItems
-        let accent = NSColor(red: 0.64, green: 0.93, blue: 0.80, alpha: 1)
+        let accent = PrismTheme.accentColor
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let translucent = glass && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
         NSGraphicsContext.saveGraphicsState()
         let shadow = NSShadow()
-        shadow.shadowColor = .black.withAlphaComponent(0.30)
-        shadow.shadowBlurRadius = 20
+        shadow.shadowColor = .black.withAlphaComponent(dark ? 0.22 : 0.12)
+        shadow.shadowBlurRadius = 16
         shadow.set()
-        NSColor(red: 0.055, green: 0.075, blue: 0.085, alpha: glass ? 0.90 : 1).setFill()
+        (translucent ? NSColor.white.withAlphaComponent(dark ? 0.025 : 0.07) : NSColor.windowBackgroundColor).setFill()
         NSBezierPath(ovalIn: NSRect(x: 29, y: 29, width: 402, height: 402)).fill()
         NSGraphicsContext.restoreGraphicsState()
         for (index, item) in visible.enumerated() {
             let path = sectorPath(index, count: visible.count)
             let highlighted = selected == index
-            (highlighted ? accent.withAlphaComponent(0.95) : NSColor.white.withAlphaComponent(0.045)).setFill()
-            path.fill()
-            (highlighted ? accent : NSColor.white.withAlphaComponent(0.11)).setStroke()
-            path.lineWidth = 0.7
+            let top = highlighted ? accent.blended(withFraction: 0.18, of: .white)! : NSColor.white.withAlphaComponent(dark ? 0.18 : 0.57)
+            let bottom = highlighted ? accent.withAlphaComponent(0.91) : NSColor.white.withAlphaComponent(dark ? 0.04 : 0.16)
+            NSGradient(starting: top, ending: bottom)?.draw(in: path, angle: -80)
+            (highlighted ? NSColor.white.withAlphaComponent(0.8) : NSColor.white.withAlphaComponent(dark ? 0.3 : 0.85)).setStroke()
+            path.lineWidth = highlighted ? 1.4 : 0.85
             path.stroke()
             let location = geometry.labelCenter(for: index, count: visible.count)
-            let foreground = highlighted ? NSColor(red: 0.04, green: 0.13, blue: 0.12, alpha: 1) : accent
+            let foreground = highlighted ? NSColor.white : NSColor.labelColor
             let configuration = NSImage.SymbolConfiguration(pointSize: 20, weight: .light)
             if let icon = NSImage(systemSymbolName: item.symbol, accessibilityDescription: item.title)?.withSymbolConfiguration(configuration) {
                 icon.isTemplate = true
                 let tinted = NSImage(size: NSSize(width: 24, height: 24))
                 tinted.lockFocus()
-                foreground.setFill()
+                (highlighted ? NSColor.white : accent).setFill()
                 NSRect(x: 0, y: 0, width: 24, height: 24).fill()
                 icon.draw(in: NSRect(x: 2, y: 2, width: 20, height: 20), from: .zero, operation: .destinationIn, fraction: 1)
                 tinted.unlockFocus()
@@ -271,19 +305,19 @@ final class RadialDropView: NSView {
             drawText(item.shortTitle, center: NSPoint(x: location.x, y: location.y - 15), width: visible.count > 8 ? 92 : 116,
                      font: .systemFont(ofSize: item.shortTitle.count > 16 ? 11 : 13, weight: .medium), color: foreground)
         }
-        NSColor(red: 0.07, green: 0.10, blue: 0.115, alpha: 1).setFill()
+        NSColor.white.withAlphaComponent(dark ? 0.035 : 0.22).setFill()
         NSBezierPath(ovalIn: NSRect(x: 147, y: 147, width: 166, height: 166)).fill()
-        NSColor.white.withAlphaComponent(0.10).setStroke()
+        NSColor.white.withAlphaComponent(dark ? 0.26 : 0.72).setStroke()
         NSBezierPath(ovalIn: NSRect(x: 147, y: 147, width: 166, height: 166)).stroke()
-        drawText("PRISME", center: NSPoint(x: 230, y: 265), width: 128, font: .monospacedSystemFont(ofSize: 9, weight: .semibold), color: accent.withAlphaComponent(0.6))
+        drawText("PRISME", center: NSPoint(x: 230, y: 265), width: 128, font: .systemFont(ofSize: 10, weight: .semibold), color: accent)
         let mainTitle = selected.flatMap { visible.indices.contains($0) ? visible[$0].title : nil } ?? (items.isEmpty ? "Aucune option" : mode.rawValue)
-        drawText(mainTitle, center: NSPoint(x: 230, y: 233), width: 140, font: .systemFont(ofSize: 14, weight: .medium), color: .white)
+        drawText(mainTitle, center: NSPoint(x: 230, y: 233), width: 140, font: .systemFont(ofSize: 16, weight: .semibold), color: .labelColor)
         let caption = selected == nil ? (files.count == 1 ? files[0].lastPathComponent : "\(files.count) fichiers") : "Relâchez pour appliquer"
-        drawText(caption, center: NSPoint(x: 230, y: 203), width: 132, font: .systemFont(ofSize: 10), color: .white.withAlphaComponent(0.5))
+        drawText(caption, center: NSPoint(x: 230, y: 203), width: 132, font: .systemFont(ofSize: 11), color: .secondaryLabelColor)
         if items.count > pageSize {
             drawText("‹  \(page + 1) / \(Int(ceil(Double(items.count) / Double(pageSize))))  ›", center: NSPoint(x: 230, y: 175), width: 95, font: .systemFont(ofSize: 10), color: accent)
         }
-        drawText("⇧ Formats    ⌘ Outils    ⌃ Actions", center: NSPoint(x: 230, y: 9), width: 360, font: .systemFont(ofSize: 10, weight: .medium), color: .white.withAlphaComponent(0.72))
+        drawText("⇧ Formats    ⌘ Outils    ⌃ Actions", center: NSPoint(x: 230, y: 9), width: 360, font: .systemFont(ofSize: 11, weight: .medium), color: .secondaryLabelColor)
     }
 
     private func drawText(_ text: String, center: NSPoint, width: CGFloat, font: NSFont, color: NSColor) {

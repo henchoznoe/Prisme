@@ -7,7 +7,7 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 22) {
             HStack {
                 VStack(alignment: .leading, spacing: 9) {
-                    Text("Tout ce qui a pris forme.").font(.system(size: 29, weight: .medium, design: .rounded)).tracking(-0.8)
+                    Text("Tout ce qui a pris forme.").font(.system(size: 29, weight: .semibold)).tracking(-0.8)
                     Text("Vos 100 dernières opérations, enregistrées sur ce Mac.").font(.system(size: 12)).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -17,14 +17,14 @@ struct HistoryView: View {
             }
             if model.history.isEmpty {
                 VStack(spacing: 16) {
-                    Image(systemName: "clock").font(.system(size: 35, weight: .ultraLight)).foregroundStyle(mint)
+                    Image(systemName: "clock").font(.system(size: 35, weight: .ultraLight)).foregroundStyle(PrismTheme.accent)
                     Text("Votre prochaine conversion commence ici.").font(.system(size: 14)).foregroundStyle(.secondary)
                     Button("Ajouter des fichiers…") { model.chooseFiles() }
                 }.frame(maxWidth: .infinity).padding(.vertical, 90)
             }
             ForEach(model.history) { entry in
                 HStack(alignment: .top, spacing: 14) {
-                    Image(systemName: "checkmark").font(.system(size: 13)).foregroundStyle(mint).padding(10).background(mint.opacity(0.08), in: Circle())
+                    Image(systemName: "checkmark").font(.system(size: 13)).foregroundStyle(PrismTheme.accent).padding(10).background(PrismTheme.accent.opacity(0.08), in: Circle())
                     VStack(alignment: .leading, spacing: 7) {
                         Text(entry.action).font(.system(size: 13, weight: .medium))
                         Text(entry.sources.map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", "))
@@ -33,8 +33,8 @@ struct HistoryView: View {
                     }
                     Spacer()
                     Button { model.reveal(entry.outputs) } label: { Image(systemName: "folder").font(.system(size: 15)) }
-                        .buttonStyle(.plain).foregroundStyle(mint).help("Afficher les résultats dans le Finder")
-                }.padding(17).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
+                        .buttonStyle(.plain).foregroundStyle(PrismTheme.accent).help("Afficher les résultats dans le Finder")
+                }.padding(18).prismGlass(radius: 20)
             }
         }
     }
@@ -45,7 +45,7 @@ struct PreferencesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .leading, spacing: 9) {
-                Text("À votre façon.").font(.system(size: 32, weight: .medium, design: .rounded)).tracking(-0.8)
+                Text("À votre façon.").font(.system(size: 32, weight: .semibold)).tracking(-0.8)
                 Text("Quelques réglages. Et le reste suit.").font(.system(size: 12)).foregroundStyle(.secondary)
             }
             settingsGroup("AU QUOTIDIEN") {
@@ -58,7 +58,7 @@ struct PreferencesView: View {
                 triggerPicker("Outils", selection: $model.toolsTrigger, used: [model.conversionTrigger, model.actionsTrigger])
                 triggerPicker("Actions", selection: $model.actionsTrigger, used: [model.conversionTrigger, model.toolsTrigger])
                 Picker("Apparence de la roue", selection: $model.wheelAppearance) {
-                    Text("Verre teinté").tag("glass")
+                    Text("Liquid Glass").tag("glass")
                     Text("Opaque").tag("solid")
                 }.pickerStyle(.segmented)
                 Divider().opacity(0.3)
@@ -66,7 +66,7 @@ struct PreferencesView: View {
             }
             settingsGroup("DOSSIER DE SORTIE") {
                 HStack {
-                    Image(systemName: "folder").foregroundStyle(mint)
+                    Image(systemName: "folder").foregroundStyle(PrismTheme.accent)
                     Text(model.outputFolder.isEmpty ? "À côté du fichier d’origine" : model.outputFolder).lineLimit(2).truncationMode(.middle)
                     Spacer()
                     Button("Choisir…") { model.chooseOutputFolder() }
@@ -86,14 +86,14 @@ struct PreferencesView: View {
                     Text("brew install ffmpeg pandoc webp libavif").font(.system(size: 11, design: .monospaced)).textSelection(.enabled)
                     Spacer()
                     Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString("brew install ffmpeg pandoc webp libavif", forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copier la commande")
-                }.padding(12).background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+                }.padding(13).background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12))
                 Text("Prisme ne télécharge aucun moteur et n’envoie aucun fichier. Les options nécessitant un moteur absent sont masquées.")
                     .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
             }
             HStack(alignment: .top, spacing: 14) {
                 PrismMark(size: 45)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Prisme 0.1.0").font(.system(size: 13, weight: .medium))
+                    Text("Prisme 0.2.0").font(.system(size: 13, weight: .medium))
                     Text("Un atelier de conversion indépendant, en Swift.\nSans compte, sans abonnement, sans limite d’utilisation.")
                         .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 }
@@ -115,14 +115,14 @@ struct PreferencesView: View {
             }
             Spacer()
             Label(installed ? "Disponible" : "À installer", systemImage: installed ? "checkmark.circle.fill" : "circle.dashed")
-                .font(.system(size: 10)).foregroundStyle(installed ? mint : .secondary)
+                .font(.system(size: 10)).foregroundStyle(installed ? PrismTheme.accent : .secondary)
         }.padding(.vertical, 4)
     }
 
     private func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title).font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1.7).foregroundStyle(mint.opacity(0.7))
+            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(PrismTheme.accent)
             content()
-        }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 13))
+        }.padding(22).frame(maxWidth: .infinity, alignment: .leading).prismGlass(radius: 24)
     }
 }

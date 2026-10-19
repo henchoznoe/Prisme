@@ -53,3 +53,18 @@ automated geometry tests and the agent-observed click-to-convert check.
 AirDrop recipient selection, Terminal integration and the full range of input
 codecs/document layouts have not been individually exercised. Those are explicit
 remaining coverage boundaries.
+
+## Version 0.2.0 interface refresh
+
+The blue Liquid Glass workspace, file selection, format controls, settings and
+radial wheel were inspected in the packaged app on the development Mac. The
+README contains actual workspace and wheel screenshots, with no personal files.
+The wheel's PNG hover selection was checked after the visual changes. The full
+Finder drag gesture was not repeated by the agent for this visual refresh.
+
+All 16 existing tests passed again, with zero failures and zero skips. The
+universal release build and strict signature verification also passed. The
+installed app remains an accessory app with `LSUIElement` enabled. Native glass
+uses availability guards; older macOS versions retain material fallbacks.
+Dark appearance, Reduce Transparency and older macOS runtime behavior have not
+been visually exercised in this refresh.

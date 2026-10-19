@@ -1,5 +1,7 @@
 # Prisme
 
+![Prisme — a native macOS file converter in blue glass](docs/images/banner.png)
+
 A local file workshop for macOS, written in Swift, SwiftUI and AppKit. Drag a
 file in Finder, tap **Shift**, and drop it on a segment of the circular wheel.
 Release the key while continuing to drag: the wheel stays open until the drop
@@ -10,10 +12,31 @@ Prisme has its own visual identity and implementation. The interface is in
 French. There is no account, subscription, conversion allowance, telemetry, or
 upload service.
 
+## A closer look
+
+![Prisme's French workspace, with floating glass navigation and a file drop area](docs/images/workspace.png)
+
+<table>
+<tr>
+<td width="40%"><img src="docs/images/wheel.png" width="340" alt="Prisme's circular conversion wheel, with PNG selected in blue"></td>
+<td>
+<strong>A format at the end of a gesture.</strong><br><br>
+Drag a file, tap <strong>Shift</strong>, and release it over a format.
+The glass wheel appears beside your pointer; the selected segment turns blue.
+<br><br>
+<strong>Command</strong> opens tools. <strong>Control</strong> opens file actions.
+The keys and wheel appearance can be changed in Settings.
+</td>
+</tr>
+</table>
+
+Actual screenshots of version 0.2.0 on the development Mac. The banner is an
+original illustration; its editable source is [included](docs/images/banner.svg).
+
 ## Run
 
-Requires **macOS 13 or later** and Xcode or the Apple command-line tools. Build
-on the Mac where you intend to use it:
+Runs on **macOS 13 or later**. Building requires **Xcode 26 or newer**, including
+its SDK and command-line tools:
 
 ```sh
 ./scripts/build-app.sh
@@ -71,6 +94,15 @@ Other utilities using the same drag gesture can show their own overlays too;
 close them while testing Prisme's gesture.
 
 ## Implemented scope
+
+Version 0.2 introduces a blue glass interface, floating navigation, a translucent
+workspace, and a matching app icon. It follows the system's light/dark appearance.
+On macOS 26 and later, including macOS 27, controls use Apple's
+[SwiftUI Liquid Glass](https://developer.apple.com/documentation/swiftui/glasseffectcontainer)
+and the wheel uses [NSGlassEffectView](https://developer.apple.com/documentation/appkit/nsglasseffectview).
+Older macOS versions use vibrancy/material fallbacks. Reduce Transparency and
+Reduce Motion accessibility preferences are respected. CI uses macOS 26 so it
+compiles against a Liquid Glass-capable SDK while keeping the macOS 13 target.
 
 | Family | Operations |
 | --- | --- |

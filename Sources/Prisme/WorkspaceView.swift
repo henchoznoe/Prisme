@@ -3,210 +3,169 @@ import AppKit
 import PrismeCore
 import UniformTypeIdentifiers
 
-let mint = Color(red: 0.64, green: 0.93, blue: 0.80)
-private let canvas = Color(red: 0.055, green: 0.075, blue: 0.085)
-private let card = Color.white.opacity(0.035)
-
-struct PrismMark: View {
-    var size: CGFloat = 42
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.26).fill(mint.opacity(0.10))
-            Image(systemName: "triangle.lefthalf.filled")
-                .font(.system(size: size * 0.5, weight: .light)).foregroundStyle(mint)
-        }.frame(width: size, height: size)
-    }
-}
-
 struct WorkspaceView: View {
     @EnvironmentObject var model: AppModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Rectangle().fill(Color.white.opacity(0.065)).frame(width: 1)
-            VStack(spacing: 0) {
-                HStack {
-                    Text(model.page.rawValue.uppercased()).font(.system(size: 10, weight: .semibold, design: .monospaced)).tracking(2).foregroundStyle(.secondary)
-                    Spacer()
-                    HStack(spacing: 5) {
-                        Circle().fill(mint).frame(width: 5, height: 5)
-                        Text("100 % sur votre Mac").font(.system(size: 11))
-                    }.foregroundStyle(.secondary)
-                }.padding(.horizontal, 36).padding(.top, 31).padding(.bottom, 22)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        switch model.page {
-                        case .convert: conversionPage
-                        case .history: HistoryView()
-                        case .settings: PreferencesView()
-                        }
-                    }.padding(.horizontal, 36).padding(.bottom, 30)
-                        .frame(maxWidth: 1100, alignment: .leading)
-                        .frame(maxWidth: .infinity)
-                }
-                if model.isWorking { activityBar }
+        VStack(spacing: 0) {
+            header
+            navigation.padding(.top, 17).padding(.bottom, 24)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    switch model.page {
+                    case .convert: conversionPage
+                    case .history: HistoryView()
+                    case .settings: PreferencesView()
+                    }
+                }.padding(.horizontal, 30).padding(.bottom, 22)
+                    .frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
             }
+            if model.isWorking { activityBar }
+            else if model.page == .convert, !model.files.isEmpty, let action = model.selectedAction { conversionBar(action) }
+            else { footer }
         }
-        .background(canvas)
-        .tint(mint)
+        .background(PrismBackdrop())
+        .background(WindowChrome().frame(width: 0, height: 0))
+        .tint(PrismTheme.accent)
         .onAppear { model.openMainWindow = { openWindow(id: "main") } }
         .alert("L’opération n’a pas abouti", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
             Button("Fermer", role: .cancel) { model.errorMessage = nil }
         } message: { Text(model.errorMessage ?? "") }
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 11) {
-                PrismMark()
-                Text("Prisme").font(.system(size: 24, weight: .semibold, design: .rounded)).tracking(-0.8)
-            }.padding(.top, 44).padding(.bottom, 44)
-            Text("VOTRE ATELIER").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(2).foregroundStyle(.secondary).padding(.bottom, 14)
-            ForEach(WorkspacePage.allCases, id: \.self) { page in
-                Button {
-                    model.page = page
-                } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: page.symbol).font(.system(size: 15)).frame(width: 20)
-                        Text(page.rawValue).font(.system(size: 13, weight: model.page == page ? .medium : .regular))
-                        Spacer()
-                        if page == .history && !model.history.isEmpty {
-                            Text("\(model.history.count)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                        }
-                    }.foregroundStyle(model.page == page ? mint : .white.opacity(0.5))
-                        .padding(.horizontal, 13).padding(.vertical, 12)
-                        .background(model.page == page ? mint.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 9))
-                        .contentShape(Rectangle())
-                }.buttonStyle(.plain).padding(.horizontal, -13).padding(.bottom, 5)
+    private var header: some View {
+        HStack(spacing: 12) {
+            PrismMark(size: 38)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Prisme").font(.system(size: 21, weight: .semibold)).tracking(-0.6)
+                Text("Un autre format. Le même élan.").font(.system(size: 11)).foregroundStyle(.secondary)
             }
             Spacer()
-            VStack(alignment: .leading, spacing: 13) {
-                Image(systemName: "cursorarrow.motionlines").font(.system(size: 21, weight: .light)).foregroundStyle(mint.opacity(0.8))
-                Text("Un geste suffit.").font(.system(size: 13, weight: .medium))
-                Text("Glissez un fichier, puis appuyez sur Maj pour ouvrir la palette.").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
-                HStack(spacing: 6) {
-                    KeyCap(text: "⇧"); Text("pendant le glisser").font(.system(size: 10)).foregroundStyle(.secondary)
-                }
-            }.padding(15).background(card, in: RoundedRectangle(cornerRadius: 12)).padding(.horizontal, -6)
-            HStack {
-                Text("PRISME").tracking(2)
-                Spacer()
-                Text("0.1.0")
-            }.font(.system(size: 9, design: .monospaced)).foregroundStyle(.white.opacity(0.25)).padding(.top, 26)
-        }.padding(.horizontal, 25).padding(.bottom, 24).frame(width: 205)
-            .background(Color.white.opacity(0.018))
+            Label("Sur votre Mac", systemImage: "lock.shield")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                .padding(.horizontal, 12).padding(.vertical, 9).prismGlass(radius: 18)
+            GlassIconButton(symbol: "plus", label: "Ajouter des fichiers", action: model.chooseFiles).disabled(model.isWorking)
+        }.padding(.horizontal, 30).padding(.top, 32)
+    }
+
+    private var navigation: some View {
+        HStack(spacing: 4) {
+            ForEach(WorkspacePage.allCases, id: \.self) { page in
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { model.page = page }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: page.symbol).font(.system(size: 13, weight: .medium))
+                        Text(page.rawValue).font(.system(size: 12, weight: .medium))
+                        if page == .history, !model.history.isEmpty {
+                            Text("\(model.history.count)").font(.system(size: 9, weight: .semibold))
+                                .padding(.horizontal, 5).padding(.vertical, 2).background(.primary.opacity(0.07), in: Capsule())
+                        }
+                    }.foregroundStyle(model.page == page ? PrismTheme.accent : .primary.opacity(0.65))
+                        .padding(.horizontal, 20).padding(.vertical, 11)
+                        .background {
+                            if model.page == page {
+                                Capsule().fill(PrismTheme.accent.opacity(0.12))
+                                    .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.6))
+                            }
+                        }.contentShape(Capsule())
+                }.buttonStyle(.plain)
+            }
+        }.padding(5).prismGlass(radius: 28, interactive: true)
     }
 
     private var conversionPage: some View {
-        VStack(alignment: .leading, spacing: 23) {
-            VStack(alignment: .leading, spacing: 11) {
-                Text("Changez de format.\nGardez le fil.").font(.system(size: 39, weight: .medium, design: .rounded)).tracking(-1.5).lineSpacing(-1)
-                Text("Des fichiers transformés, sans détour et sans envoi en ligne.")
-                    .font(.system(size: 13)).foregroundStyle(.secondary)
-            }.padding(.bottom, 4)
-            HStack(spacing: 7) {
-                FeaturePill(symbol: "photo", title: "Images")
-                FeaturePill(symbol: "waveform", title: "Audio & vidéo")
-                FeaturePill(symbol: "doc", title: "PDF & textes")
-                FeaturePill(symbol: "archivebox", title: "Archives")
+        VStack(alignment: .leading, spacing: 21) {
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Donnez une autre forme à vos fichiers.").font(.system(size: 28, weight: .semibold)).tracking(-0.9)
+                Text("Choisissez un format, Prisme s’occupe de la suite.").font(.system(size: 12)).foregroundStyle(.secondary)
             }
-            DropArea().frame(height: model.files.isEmpty ? 205 : 116)
-            if !model.files.isEmpty {
+            if model.files.isEmpty {
+                HStack(spacing: 18) {
+                    DropArea().frame(maxWidth: .infinity).frame(height: 292)
+                    GestureGuide().frame(width: 240, height: 292)
+                }
+                HStack(spacing: 8) {
+                    FormatTag(symbol: "photo", text: "Images")
+                    FormatTag(symbol: "waveform", text: "Audio & vidéo")
+                    FormatTag(symbol: "doc.text", text: "PDF & documents")
+                    FormatTag(symbol: "archivebox", text: "Archives")
+                    Spacer()
+                    Text("Les originaux restent intacts.").font(.system(size: 11)).foregroundStyle(.secondary)
+                }.padding(.horizontal, 3)
+            } else {
+                DropArea().frame(height: 105)
                 fileList
                 actionPicker
-            } else {
-                HStack(alignment: .top, spacing: 22) {
-                    HintStep(number: "01", title: "Déposez", detail: "Un fichier, un dossier ou tout un lot.")
-                    HintStep(number: "02", title: "Choisissez", detail: "Les options s’adaptent à vos fichiers.")
-                    HintStep(number: "03", title: "C’est prêt", detail: "Le résultat apparaît à côté de l’original.")
-                }.padding(.top, 3)
             }
             if let message = model.successMessage {
-                Label(message, systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(mint)
-                    .padding(14).frame(maxWidth: .infinity, alignment: .leading).background(mint.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+                Label(message, systemImage: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(PrismTheme.accent)
+                    .padding(15).frame(maxWidth: .infinity, alignment: .leading).prismGlass(radius: 16, selected: true)
             }
         }
     }
 
     private var fileList: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(spacing: 10) {
             HStack {
-                Text("\(model.files.count) FICHIER\(model.files.count > 1 ? "S" : "")").font(.system(size: 10, weight: .medium, design: .monospaced)).tracking(1.3).foregroundStyle(.secondary)
+                Text("\(model.files.count) fichier\(model.files.count > 1 ? "s" : "")").font(.system(size: 12, weight: .semibold))
                 Spacer()
-                Button { model.presentQuickPalette?(model.files) } label: {
-                    Label("Ouvrir la roue", systemImage: "circle.hexagongrid")
-                }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(mint).padding(.trailing, 12).disabled(model.isWorking)
-                Button("Tout retirer") { model.files = []; model.selectedActionID = nil }.buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary).disabled(model.isWorking)
-            }
+                Button { model.presentQuickPalette?(model.files) } label: { Label("Ouvrir la roue", systemImage: "circle.hexagongrid") }
+                    .buttonStyle(.plain).font(.system(size: 11, weight: .medium)).foregroundStyle(PrismTheme.accent)
+                    .padding(.horizontal, 12).padding(.vertical, 8).prismGlass(radius: 16, interactive: true)
+                Button("Tout retirer") { model.files = []; model.selectedActionID = nil }
+                    .buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary).padding(.leading, 6)
+            }.disabled(model.isWorking)
             ForEach(model.files, id: \.self) { url in
-                HStack(spacing: 11) {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 26, height: 26)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(url.lastPathComponent).font(.system(size: 12)).lineLimit(1)
+                HStack(spacing: 12) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 30, height: 30)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(url.lastPathComponent).font(.system(size: 12, weight: .medium)).lineLimit(1)
                         Text(url.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                             .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     }
                     Spacer()
-                    Text(url.pathExtension.uppercased()).font(.system(size: 9, design: .monospaced)).foregroundStyle(mint.opacity(0.8))
-                    Button { model.files.removeAll { $0 == url }; model.selectedActionID = nil } label: { Image(systemName: "xmark").font(.system(size: 9)) }
-                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Retirer ce fichier").disabled(model.isWorking)
-                }.padding(11).background(card, in: RoundedRectangle(cornerRadius: 9))
+                    Text(url.pathExtension.uppercased()).font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                        .padding(.horizontal, 8).padding(.vertical, 5).background(.primary.opacity(0.04), in: Capsule())
+                    Button { model.files.removeAll { $0 == url }; model.selectedActionID = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary) }
+                        .buttonStyle(.plain).help("Retirer ce fichier").disabled(model.isWorking)
+                }.padding(13).prismGlass(radius: 16)
             }
         }
     }
 
     private var actionPicker: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack {
-                ForEach([PaletteMode.convert, .tools], id: \.self) { mode in
-                    Button { model.mode = mode; model.selectedActionID = nil } label: {
-                        Text(mode.rawValue).font(.system(size: 12, weight: .medium))
-                            .padding(.horizontal, 14).padding(.vertical, 7)
-                            .foregroundStyle(model.mode == mode ? mint : .secondary)
-                            .background(model.mode == mode ? mint.opacity(0.1) : .clear, in: Capsule())
-                    }.buttonStyle(.plain)
-                }
-                Spacer()
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            Picker("Opération", selection: $model.mode) {
+                Text("Formats").tag(PaletteMode.convert)
+                Text("Outils").tag(PaletteMode.tools)
+            }.pickerStyle(.segmented).frame(width: 210).onChange(of: model.mode) { _ in model.selectedActionID = nil }
             if model.visibleActions.isEmpty {
                 Text("Aucune opération commune à cette sélection. Essayez un fichier seul ou vérifiez les moteurs dans Réglages.")
                     .font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 8)
             } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 9)], spacing: 9) {
-                    ForEach(model.visibleActions) { action in
-                        ActionCard(action: action, selected: model.selectedAction?.id == action.id) { model.selectedActionID = action.id }
+                PrismGlassGroup {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 175), spacing: 10)], spacing: 10) {
+                        ForEach(model.visibleActions) { action in
+                            ActionCard(action: action, selected: model.selectedAction?.id == action.id) { model.selectedActionID = action.id }
+                        }
                     }
                 }
-                if let action = model.selectedAction {
-                    operationOptions(action)
-                    HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("DESTINATION").font(.system(size: 8, design: .monospaced)).tracking(1.5).foregroundStyle(.secondary)
-                            Text(model.outputFolder.isEmpty ? "À côté de chaque original" : URL(fileURLWithPath: model.outputFolder).lastPathComponent)
-                                .font(.system(size: 11)).lineLimit(1)
-                        }
-                        Button { model.chooseOutputFolder() } label: { Image(systemName: "folder").font(.system(size: 12)) }.buttonStyle(.plain).foregroundStyle(.secondary).help("Changer de dossier")
-                        Spacer()
-                        Button { model.runSelected() } label: {
-                            HStack(spacing: 9) { Text(action.title); Image(systemName: "arrow.right") }
-                                .font(.system(size: 12, weight: .semibold)).foregroundStyle(canvas)
-                                .padding(.horizontal, 18).padding(.vertical, 12).background(mint, in: RoundedRectangle(cornerRadius: 9))
-                        }.buttonStyle(.plain).disabled(model.isWorking).keyboardShortcut(.return, modifiers: .command)
-                    }.padding(.top, 5)
-                }
+                if let action = model.selectedAction { operationOptions(action) }
             }
         }.disabled(model.isWorking)
     }
 
     @ViewBuilder private func operationOptions(_ action: ConversionAction) -> some View {
         if action.id.contains("compress") || action.id.hasPrefix("convert.image.") {
-            HStack {
+            HStack(spacing: 12) {
                 Text("Qualité").font(.system(size: 11)).foregroundStyle(.secondary)
-                Slider(value: $model.quality, in: 0.1...1).frame(maxWidth: 200)
-                Text("\(Int(model.quality * 100)) %").font(.system(size: 10, design: .monospaced)).foregroundStyle(mint)
+                Slider(value: $model.quality, in: 0.1...1).frame(maxWidth: 210)
+                Text("\(Int(model.quality * 100)) %").font(.system(size: 11, weight: .medium)).monospacedDigit().foregroundStyle(PrismTheme.accent)
                 Spacer()
-            }
+            }.padding(.top, 3)
         }
         if action.id.contains("resize") {
             HStack {
@@ -225,13 +184,43 @@ struct WorkspaceView: View {
         }
     }
 
+    private func conversionBar(_ action: ConversionAction) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "folder").font(.system(size: 16)).foregroundStyle(PrismTheme.accent)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Enregistrer le résultat").font(.system(size: 10)).foregroundStyle(.secondary)
+                Text(model.outputFolder.isEmpty ? "À côté de chaque original" : URL(fileURLWithPath: model.outputFolder).lastPathComponent)
+                    .font(.system(size: 11, weight: .medium)).lineLimit(1)
+            }
+            Button("Modifier…", action: model.chooseOutputFolder).buttonStyle(.plain).font(.system(size: 11)).foregroundStyle(.secondary)
+            Spacer()
+            Button(action: model.runSelected) {
+                HStack(spacing: 10) { Text(action.title); Image(systemName: "arrow.right") }
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 22).padding(.vertical, 13)
+                    .background(LinearGradient(colors: [PrismTheme.accent.opacity(0.85), PrismTheme.accent], startPoint: .top, endPoint: .bottom), in: Capsule())
+                    .overlay(Capsule().strokeBorder(.white.opacity(0.4), lineWidth: 0.8))
+                    .shadow(color: PrismTheme.accent.opacity(0.25), radius: 9, y: 3)
+            }.buttonStyle(.plain).keyboardShortcut(.return, modifiers: .command)
+        }.padding(15).prismGlass(radius: 23).padding(.horizontal, 30).padding(.bottom, 20)
+    }
+
     private var activityBar: some View {
         HStack(spacing: 13) {
             ProgressView().controlSize(.small)
             Text("\(model.activity)…").font(.system(size: 12))
             Spacer()
-            Button("Annuler") { model.cancel() }.buttonStyle(.plain).foregroundStyle(mint).font(.system(size: 11))
-        }.padding(18).background(mint.opacity(0.05))
+            Button("Annuler", action: model.cancel).buttonStyle(.plain).foregroundStyle(PrismTheme.accent).font(.system(size: 11))
+        }.padding(18).prismGlass(radius: 20).padding(.horizontal, 30).padding(.bottom, 20)
+    }
+
+    private var footer: some View {
+        HStack {
+            Image(systemName: "circle.inset.filled").font(.system(size: 7)).foregroundStyle(PrismTheme.accent)
+            Text("Prisme veille dans la barre de menus").font(.system(size: 10)).foregroundStyle(.secondary)
+            Spacer()
+            Text("⇧ Formats     ⌘ Outils     ⌃ Actions").font(.system(size: 10)).foregroundStyle(.secondary)
+        }.padding(.horizontal, 33).padding(.vertical, 17)
     }
 }
 
@@ -239,18 +228,19 @@ struct DropArea: View {
     @EnvironmentObject var model: AppModel
     @State private var targeted = false
     var body: some View {
-        Button { model.chooseFiles() } label: {
-            VStack(spacing: 12) {
-                Image(systemName: "square.and.arrow.down").font(.system(size: model.files.isEmpty ? 30 : 23, weight: .ultraLight)).foregroundStyle(mint)
-                Text(model.files.isEmpty ? "Déposez vos fichiers ici" : "Ajouter d’autres fichiers")
-                    .font(.system(size: model.files.isEmpty ? 17 : 13, weight: .medium, design: .rounded))
-                if model.files.isEmpty {
-                    HStack(spacing: 4) { Text("ou").foregroundStyle(.secondary); Text("parcourez votre Mac").foregroundStyle(mint); Image(systemName: "arrow.up.right").foregroundStyle(mint) }.font(.system(size: 11))
+        Button(action: model.chooseFiles) {
+            VStack(spacing: model.files.isEmpty ? 18 : 9) {
+                if model.files.isEmpty { FloatingFiles().frame(height: 105) }
+                else { Image(systemName: "plus.circle").font(.system(size: 23, weight: .light)).foregroundStyle(PrismTheme.accent) }
+                VStack(spacing: 7) {
+                    Text(model.files.isEmpty ? "Déposez vos fichiers" : "Ajouter d’autres fichiers")
+                        .font(.system(size: model.files.isEmpty ? 21 : 13, weight: .semibold)).tracking(-0.4)
+                    if model.files.isEmpty { Text("ou parcourez votre Mac").font(.system(size: 12)).foregroundStyle(PrismTheme.accent) }
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(mint.opacity(targeted ? 0.09 : 0.025), in: RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(mint.opacity(targeted ? 0.8 : 0.25), style: StrokeStyle(lineWidth: 1, dash: [5, 5])))
-                .contentShape(Rectangle())
+                .prismGlass(radius: 28, selected: targeted, interactive: true)
+                .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(PrismTheme.accent.opacity(targeted ? 0.8 : 0.22), style: StrokeStyle(lineWidth: 1, dash: [5, 5])).padding(7))
+                .contentShape(RoundedRectangle(cornerRadius: 28))
         }.buttonStyle(.plain).disabled(model.isWorking)
             .onDrop(of: [UTType.fileURL.identifier], isTargeted: $targeted) { providers in
                 guard !model.isWorking else { return false }
@@ -260,56 +250,77 @@ struct DropArea: View {
     }
 }
 
+private struct FloatingFiles: View {
+    var body: some View {
+        PrismGlassGroup {
+            ZStack {
+                file("doc.text", color: .indigo).rotationEffect(.degrees(-17)).offset(x: -47, y: 4)
+                file("waveform", color: PrismTheme.accent).rotationEffect(.degrees(16)).offset(x: 47, y: 5)
+                file("photo", color: PrismTheme.accent).offset(y: -5)
+            }
+        }.accessibilityHidden(true)
+    }
+    private func file(_ symbol: String, color: Color) -> some View {
+        Image(systemName: symbol).font(.system(size: 27, weight: .light)).foregroundStyle(color)
+            .frame(width: 69, height: 82).prismGlass(radius: 18)
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.45), lineWidth: 0.6))
+            .shadow(color: color.opacity(0.09), radius: 10, y: 9)
+    }
+}
+
+private struct GestureGuide: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Image(systemName: "cursorarrow.motionlines").font(.system(size: 27, weight: .light)).foregroundStyle(PrismTheme.accent)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Au bout du geste.").font(.system(size: 17, weight: .semibold)).tracking(-0.4)
+                Text("Glissez un fichier, puis appuyez sur une touche pour ouvrir la roue.").font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(3)
+            }
+            VStack(spacing: 9) {
+                row("⇧", "Formats", "arrow.triangle.2.circlepath")
+                row("⌘", "Outils", "slider.horizontal.3")
+                row("⌃", "Actions", "square.and.arrow.up")
+            }
+        }.padding(22).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading).prismGlass(radius: 28)
+    }
+    private func row(_ key: String, _ title: String, _ symbol: String) -> some View {
+        HStack(spacing: 11) {
+            KeyCap(text: key)
+            Text(title).font(.system(size: 11, weight: .medium))
+            Spacer()
+            Image(systemName: symbol).font(.system(size: 11)).foregroundStyle(.tertiary)
+        }
+    }
+}
+
 struct ActionCard: View {
     let action: ConversionAction
     let selected: Bool
     let activate: () -> Void
+    @State private var hovering = false
     var body: some View {
         Button(action: activate) {
-            HStack(spacing: 11) {
-                Image(systemName: action.symbol).font(.system(size: 17, weight: .light)).frame(width: 23).foregroundStyle(selected ? mint : .secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(action.title).font(.system(size: 12, weight: .medium)).foregroundStyle(selected ? mint : .white.opacity(0.85))
+            HStack(spacing: 10) {
+                Image(systemName: action.symbol).font(.system(size: 19, weight: .light)).frame(width: 26).foregroundStyle(PrismTheme.accent)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(action.title).font(.system(size: 12, weight: .semibold)).foregroundStyle(.primary)
                     Text(action.detail).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
                 }
                 Spacer(minLength: 0)
-                if selected { Image(systemName: "checkmark.circle.fill").font(.system(size: 12)).foregroundStyle(mint) }
-            }.padding(13).frame(maxWidth: .infinity, minHeight: 55, alignment: .leading)
-                .background(selected ? mint.opacity(0.075) : card, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? mint.opacity(0.4) : .white.opacity(0.05), lineWidth: 1))
-                .contentShape(Rectangle())
-        }.buttonStyle(.plain)
+                if selected { Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundStyle(PrismTheme.accent) }
+            }.padding(14).frame(maxWidth: .infinity, minHeight: 58, alignment: .leading).contentShape(RoundedRectangle(cornerRadius: 18))
+        }.buttonStyle(.plain).prismGlass(radius: 18, selected: selected, interactive: true)
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(PrismTheme.accent.opacity(hovering ? 0.3 : 0), lineWidth: 1))
+            .onHover { hovering = $0 }
     }
 }
 
-struct FeaturePill: View {
+private struct FormatTag: View {
     let symbol: String
-    let title: String
-    var body: some View {
-        Label(title, systemImage: symbol).font(.system(size: 10)).foregroundStyle(.white.opacity(0.55))
-            .padding(.horizontal, 10).padding(.vertical, 7).background(card, in: Capsule())
-    }
-}
-
-struct KeyCap: View {
     let text: String
     var body: some View {
-        Text(text).font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.7))
-            .frame(minWidth: 26, minHeight: 23).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
-            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(.white.opacity(0.08)))
-    }
-}
-
-private struct HintStep: View {
-    let number: String
-    let title: String
-    let detail: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(number).font(.system(size: 10, design: .monospaced)).foregroundStyle(mint.opacity(0.5))
-            Text(title).font(.system(size: 13, weight: .medium))
-            Text(detail).font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
-        }.frame(maxWidth: .infinity, alignment: .leading)
+        Label(text, systemImage: symbol).font(.system(size: 10)).foregroundStyle(.secondary)
+            .padding(.horizontal, 10).padding(.vertical, 8).prismGlass(radius: 16)
     }
 }
 
