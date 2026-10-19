@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import PrismeCore
+import Darwin
 
 struct WheelItem {
     let id: String
@@ -208,7 +209,8 @@ final class RadialDropView: NSView {
         let innerInset = Double(corner / innerRadius) * 180 / .pi
         func point(_ radius: CGFloat, _ angle: Double) -> NSPoint {
             let radians = angle * .pi / 180
-            return NSPoint(x: centerPoint.x + radius * cos(radians), y: centerPoint.y + radius * sin(radians))
+            return NSPoint(x: centerPoint.x + radius * CGFloat(Darwin.cos(radians)),
+                           y: centerPoint.y + radius * CGFloat(Darwin.sin(radians)))
         }
         let path = NSBezierPath()
         func roundedCorner(to destination: NSPoint, via control: NSPoint) {

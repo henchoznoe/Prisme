@@ -20,6 +20,10 @@ on the Mac where you intend to use it:
 open dist/Prisme.app
 ```
 
+For everyday use, drag `dist/Prisme.app` into the macOS Applications folder.
+Then press Command–Space, type **Prisme**, and press Return. The menu bar icon
+keeps the conversion wheel available after closing the main window.
+
 To build a universal Apple silicon + Intel application:
 
 ```sh
