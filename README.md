@@ -88,8 +88,11 @@ unique names beside the source or in a chosen output folder. Temporary output is
 removed when its operation fails or is cancelled. For multi-file or multi-page
 operations, earlier completed outputs may remain if a later item fails.
 
-The global wheel reads the system drag pasteboard only while a mouse drag and
-configured modifier are detected; it does not install a keyboard event tap.
+The global wheel requires an actual file drag and a configured modifier.
+Cmd-click, Shift-click and Finder multi-selection do not activate it. A new
+press must produce a native mouse-drag event and fresh file data on the system
+drag pasteboard; retained files from an earlier drag are ignored. Mouse event
+monitors leave input events unchanged; no global keyboard event tap is installed.
 Other utilities using the same drag gesture can show their own overlays too;
 close them while testing Prisme's gesture.
 
@@ -139,7 +142,7 @@ swift test --disable-sandbox
 ```
 
 `PrismeCore` owns conversion, subprocess cancellation, unique output commits,
-safe archive extraction, and wheel selection geometry. `Prisme` owns SwiftUI
+safe archive extraction, drag-session eligibility, and wheel selection geometry. `Prisme` owns SwiftUI
 screens, menu bar lifecycle, AppKit drag tracking, and the radial drop target.
 Tests generate their own fixtures. Optional-engine tests skip only when the
 engine is missing. CI builds and tests on macOS and uploads the built app.

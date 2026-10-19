@@ -68,3 +68,24 @@ installed app remains an accessory app with `LSUIElement` enabled. Native glass
 uses availability guards; older macOS versions retain material fallbacks.
 Dark appearance, Reduce Transparency and older macOS runtime behavior have not
 been visually exercised in this refresh.
+
+## Version 0.2.1 drag-trigger correction
+
+The previous trigger mistook a pressed left mouse button for a drag and read
+file URLs retained on the drag pasteboard after an earlier operation. The new
+trigger requires a new mouse-down/mouse-drag sequence, pasteboard ownership that
+changed since that press, and file URLs from that current gesture. Mouse-up
+clears eligibility, including clicks between polling ticks. Local and global
+mouse monitors return input unchanged; no keyboard event tap was added.
+
+Seven regression tests cover clicks without movement, window/selection drags
+with stale pasteboard data, a fresh drag, delayed pasteboard publication,
+release, rapid multi-selection and a new drag of the same files. Together with
+the existing conversion and geometry suite, all 23 tests passed with no skips.
+The universal release build and strict installed signature verification passed.
+The corrected 0.2.1 bundle was installed in Applications and relaunched.
+
+In a Finder folder containing generated text fixtures, Cmd-click selected both
+files normally. A complete modifier + live drag check remains separate from
+the automated session tests; the UI-control tool cannot hold a modifier during
+its drag operation.

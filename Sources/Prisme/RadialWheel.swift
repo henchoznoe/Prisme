@@ -18,16 +18,30 @@ final class GlobalDragController {
     private var panel: NSPanel?
     private var wheel: RadialDropView?
     private var wheelSurface: NSView?
-    private var wasDragging = false
+    private var wasLeftButtonDown = false
+    private var dragSession = FileDragSession()
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
+    private var pendingDismiss: DispatchWorkItem?
     private var previousFlags: NSEvent.ModifierFlags = []
     private var dismissedDuringDrag = false
 
     init(model: AppModel) { self.model = model }
 
     func start() {
+        guard timer == nil else { return }
         model.dismissQuickPalette = { [weak self] in self?.dismiss() }
         model.presentQuickPalette = { [weak self] urls in self?.show(urls: urls, mode: .convert, at: NSEvent.mouseLocation) }
-        // The system drag pasteboard and modifier state avoid an accessibility event tap.
+        // Mouse-only monitors observe complete gestures, including clicks between timer ticks.
+        // They leave events untouched and do not require a global keyboard event tap.
+        let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+            MainActor.assumeIsolated { self?.observeMouse(event) }
+        }
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+            MainActor.assumeIsolated { self?.observeMouse(event) }
+            return event
+        }
         let timer = Timer(timeInterval: 0.055, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
@@ -35,27 +49,65 @@ final class GlobalDragController {
         self.timer = timer
     }
 
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
+        globalMouseMonitor = nil
+        localMouseMonitor = nil
+        pendingDismiss?.cancel()
+        dragSession.mouseUp()
+        dismiss()
+    }
+
+    private func observeMouse(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            pendingDismiss?.cancel()
+            dragSession.mouseDown(pasteboardChangeCount: NSPasteboard(name: .drag).changeCount)
+            dismissedDuringDrag = false
+        case .leftMouseDragged:
+            dragSession.mouseDragged()
+        case .leftMouseUp:
+            dragSession.mouseUp()
+            dismissAfterDrop()
+        default: break
+        }
+    }
+
+    private func dismissAfterDrop() {
+        guard panel?.isVisible == true else { return }
+        pendingDismiss?.cancel()
+        // Let the destination process its drop before closing the panel.
+        let work = DispatchWorkItem { [weak self] in
+            guard NSEvent.pressedMouseButtons & 1 == 0 else { return }
+            self?.dismiss()
+        }
+        pendingDismiss = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
+    }
+
     private func poll() {
-        let dragging = NSEvent.pressedMouseButtons & 1 != 0
+        let leftButtonDown = NSEvent.pressedMouseButtons & 1 != 0
         let flags = NSEvent.modifierFlags.intersection([.shift, .command, .control, .option])
-        defer { wasDragging = dragging; previousFlags = flags }
+        defer { wasLeftButtonDown = leftButtonDown; previousFlags = flags }
         guard model.globalDragEnabled, !model.isWorking else { if panel?.isVisible == true { dismiss() }; return }
-        if dragging && !wasDragging { dismissedDuringDrag = false }
-        if !dragging && wasDragging {
-            // Drag destinations process the drop before the next run-loop cycle.
-            if panel?.isVisible == true {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in self?.dismiss() }
-            }
+        if !leftButtonDown {
+            dragSession.mouseUp()
+            if wasLeftButtonDown { dismissAfterDrop() }
             return
         }
-        guard dragging, !dismissedDuringDrag, flags != previousFlags || !wasDragging || panel?.isVisible != true else { return }
+        let pasteboard = NSPasteboard(name: .drag)
+        guard !dismissedDuringDrag,
+              dragSession.allowsPasteboardRead(changeCount: pasteboard.changeCount),
+              flags != previousFlags || panel?.isVisible != true else { return }
         let mode: PaletteMode?
         if flags.contains(DragKey.flag(model.conversionTrigger)) { mode = .convert }
         else if flags.contains(DragKey.flag(model.toolsTrigger)) { mode = .tools }
         else if flags.contains(DragKey.flag(model.actionsTrigger)) { mode = .actions }
         else { mode = nil }
         guard let mode else { return }
-        let pasteboard = NSPasteboard(name: .drag)
         let urls = (pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [NSURL] ?? []).map { $0 as URL }
         guard !urls.isEmpty else { return }
         show(urls: urls, mode: mode, at: NSEvent.mouseLocation)
@@ -63,6 +115,7 @@ final class GlobalDragController {
 
     func show(urls: [URL], mode: PaletteMode, at point: NSPoint) {
         guard !model.isWorking else { return }
+        pendingDismiss?.cancel()
         model.quickFiles = urls
         model.quickMode = mode
         let items: [WheelItem]

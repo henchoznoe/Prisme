@@ -93,7 +93,7 @@ struct PreferencesView: View {
             HStack(alignment: .top, spacing: 14) {
                 PrismMark(size: 45)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Prisme 0.2.0").font(.system(size: 13, weight: .medium))
+                    Text("Prisme 0.2.1").font(.system(size: 13, weight: .medium))
                     Text("Un atelier de conversion indépendant, en Swift.\nSans compte, sans abonnement, sans limite d’utilisation.")
                         .font(.system(size: 11)).foregroundStyle(.secondary).lineSpacing(4)
                 }
