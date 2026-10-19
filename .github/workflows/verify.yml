@@ -1,0 +1,21 @@
+name: Verify macOS app
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install optional conversion engines
+        run: brew install ffmpeg pandoc webp libavif
+      - name: Test real conversion fixtures and wheel geometry
+        run: swift test --disable-sandbox
+      - name: Build application
+        run: ./scripts/build-app.sh --universal
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Prisme-macOS
+          path: dist/Prisme-macOS.zip
